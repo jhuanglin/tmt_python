@@ -45,6 +45,8 @@ def login(request):
                 status = False
                 err_code = '101'
             else:
+                request.session['user_id'] = user.id
+                pdb.set_trace()
                 status = True
                 err_code = 1
         response = {
@@ -52,3 +54,14 @@ def login(request):
             "err_code": err_code
         }
         return JsonResponse(response)
+
+def logout(request):
+    try:
+        del request.session['user_id']
+    except:
+        pass
+    response = {
+        'status': True,
+        'err_code': 1
+    }
+    return JsonResponse(response)

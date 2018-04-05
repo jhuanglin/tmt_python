@@ -22,5 +22,6 @@ urlpatterns = [
     path('', TemplateView.as_view(template_name="index.html")),
     path(r'api/login', tmt_views.login),
     path(r'api/register', tmt_views.register),
+    path(r'api/logout', tmt_views.logout),
     path('admin/', admin.site.urls),
 ]
