@@ -23,5 +23,7 @@ urlpatterns = [
     path(r'api/login', tmt_views.login),
     path(r'api/register', tmt_views.register),
     path(r'api/logout', tmt_views.logout),
+    path(r'api/addconfig', tmt_views.addconfig),
+    path(r'api/config', tmt_views.config),
     path('admin/', admin.site.urls),
 ]
