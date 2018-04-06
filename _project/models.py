@@ -34,10 +34,17 @@ class Label(models.Model):
     """ Label model """
     name = models.CharField(max_length=30)
 
+    def __str__(self):
+        return 'name: %s' % (self.name)
+    __repr__ = __str__
+
 # 状态表
 class Status(models.Model):
     """ Status model """
     status = models.CharField(max_length=30)
+
+    def __str__(self):
+        return 'status: %s' % (self.status)
 
 # 任务清单表
 class List(models.Model):
@@ -60,10 +67,14 @@ class List(models.Model):
     end_time = models.DateField()
     # 状态
     # status = models.CharField(max_length=30)
-    status = models.ForeignKey('Status', on_delete=models.SET_NULL)
+    status = models.ForeignKey('Status', on_delete=models.CASCADE)
     # 总结
     summary = models.TextField()
-    label = models.ForeignKey('Label', on_delete=models.SET_NULL)
+    # 标签
+    label = models.ForeignKey('Label', on_delete=models.CASCADE)
+    # 用户
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+
 
 # 番茄表
 class Promo(models.Model):
@@ -72,4 +83,5 @@ class Promo(models.Model):
     start_date = models.DateTimeField()
     # 结束时间
     end_date = models.DateTimeField(auto_now_add=True)
+    # promo_id
     promo = models.ForeignKey('List', on_delete=models.CASCADE)
