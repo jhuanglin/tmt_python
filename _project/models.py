@@ -49,32 +49,37 @@ class Status(models.Model):
 # 任务清单表
 class List(models.Model):
     """ List model """
+    # id
+    list_id = models.AutoField(primary_key=True)
     # 名称
     title = models.CharField(max_length=200)
     # 完成标志
-    comlete = models.BooleanField(default=False)
+    complete = models.BooleanField(default=False)
     # 预计番茄完成数量
     tmt_counts = models.IntegerField(default=1)
     # 实际番茄完成数量
-    complete_counts = models.IntegerField()
+    complete_counts = models.IntegerField(default=0)
     # 创立时间
     create_time = models.DateTimeField(auto_now_add=True)
     # 完成时间
-    done_time = models.DateTimeField()
+    done_time = models.DateTimeField(null=True)
     # 预计开始时间
-    start_time = models.DateField()
+    start_time = models.DateField(null=True)
     # 预计结束时间
-    end_time = models.DateField()
+    end_time = models.DateField(null=True)
     # 状态
     # status = models.CharField(max_length=30)
-    status = models.ForeignKey('Status', on_delete=models.CASCADE)
+    status = models.ForeignKey('Status', on_delete=models.CASCADE, null=True)
     # 总结
-    summary = models.TextField()
+    summary = models.TextField(null=True)
     # 标签
     label = models.ForeignKey('Label', on_delete=models.CASCADE)
     # 用户
     user = models.ForeignKey('User', on_delete=models.CASCADE)
 
+    def __str__(self):
+        return '名称: %s, 预计开始时间: %s' % (self.title, self.start_time)
+    __repr__ = __str__
 
 # 番茄表
 class Promo(models.Model):
@@ -85,3 +90,7 @@ class Promo(models.Model):
     end_date = models.DateTimeField(auto_now_add=True)
     # promo_id
     promo = models.ForeignKey('List', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.promo_id
+    __repr__ = __str__

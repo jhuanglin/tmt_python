@@ -15,11 +15,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.views.generic.base import RedirectView
 from django.views.generic import TemplateView
 from _project import views as tmt_views
 
 urlpatterns = [
     path('', TemplateView.as_view(template_name="index.html")),
+    path(r'favicon.ico',RedirectView.as_view(url=r'static/img/favicon.ico')),
     path(r'api/login', tmt_views.login),
     path(r'api/register', tmt_views.register),
     path(r'api/logout', tmt_views.logout),
@@ -33,3 +35,4 @@ urlpatterns = [
     path(r'api/list/search_date', tmt_views.listSearchDate),
     path('admin/', admin.site.urls),
 ]
+

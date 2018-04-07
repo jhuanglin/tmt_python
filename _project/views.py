@@ -1,5 +1,7 @@
 import json
 import pdb
+import time
+import datetime
 from django.shortcuts import render
 from django.http import JsonResponse
 from _project.models import User, UserConfig, Label, List, Promo
@@ -162,11 +164,12 @@ def getLabel(request):
     ''' label '''
     label = []
     try:
+        # pdb.set_trace()
         labels = Label.objects.all().values()
         for item in labels:
             obj = {
-                'value': item.id,
-                'label': item.name
+                'value': item['id'],
+                'label': item['name']
             }
             label.append(obj)
         status = True
@@ -183,7 +186,43 @@ def getLabel(request):
 
 def getList(request):
     ''' getList '''
-    pass
+    if request.method == 'POST':
+        user_id =request.session['user_id']
+        today = datetime.date.today().strftime('%Y-%m-%d')
+        lists = []
+        try:
+            # all_lists
+            all_lists = List.objects.filter(user_id=user_id, complete=False)
+            # today_lists
+            order_lists = list(all_lists.filter(start_time=today))
+            other_lists = list(all_lists.exclude(start_time=today).order_by('-start_time'))
+            order_lists.extend(other_lists)
+            labels = Label.objects.all()
+            for item in order_lists:
+                label_index_id = item.label_id - 1
+                obj = {
+                    'list_id': item.list_id,
+                    'title': item.title,
+                    'label': labels[label_index_id].name,
+                    'start_time': item.start_time,
+                    'summary': item.summary,
+                    'complete': item.complete,
+                    'tmt_counts': item.tmt_counts,
+                    'complete_counts': item.complete_counts
+                }
+                lists.append(obj)
+            status = True
+            err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
+        response = {
+            "status": status,
+            "list": lists,
+            "err_code": err_code
+        }
+        return JsonResponse(response)
 
 # 增加个人清单
 def addList(request):
@@ -194,7 +233,10 @@ def addList(request):
         try:
             new_list = List(user_id=user_id)
             for key in list_info:
-                setattr(new_list, key, list_info[key])
+                if key == 'label':
+                    new_list.label_id = list_info[key]
+                else :
+                    setattr(new_list, key, list_info[key])
             new_list.save()
             status = True
             err_code = 1
@@ -208,13 +250,88 @@ def addList(request):
         return JsonResponse(response)
 
 # 删除个人清单
+'''
+:param list_id
+'''
 def delList(request):
-    pass
+    ''' delList '''
+    if request.method == 'POST':
+        data = json.loads(request.body.decode())
+        list_id = data['list_id']
+        try:
+            List.objects.filter(list_id=list_id).delete()
+            status = True
+            err_code = 1
+        except:
+            status = False
+            err_code = 100
+        response = {
+            'status': status,
+            'err_code': err_code
+        }
+        return JsonResponse(response)
 
 # 完成任务
 def doneList(request):
-    pass
+    if request.method == 'POST':
+        data = json.loads(request.body.decode())
+        summary = data['summary']
+        list_id = data['list_id']
+        # pdb.set_trace()
+        try:
+            done_list = List.objects.get(list_id=list_id)
+            # 保存总结
+            done_list.summary = summary
+            # 修改完成标志
+            done_list.complete = True
+            # 记录完成时间
+            done_list.done_time = datetime.datetime.now()
+            done_list.save()
+            status = True
+            err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
+        response = {
+            'status': status,
+            'err_code': err_code
+        }
+        return JsonResponse(response)
+
 
 # 查询个人清单
 def listSearchDate(request):
-    pass
+    if request.method == 'POST':
+        data = json.loads(request.body.decode())
+        start_time = datetime.datetime.strptime(data['start_time'], '%Y-%m-%d')
+        end_time = datetime.datetime.strptime(data['end_time'], '%Y-%m-%d')
+        labels = Label.objects.all()
+        lists = []
+        try:
+            filter_lists = List.objects.filter(start_time__range=(start_time, end_time)).order_by('-start_time')
+            for item in filter_lists:
+                label_index_id = item.label_id - 1
+                obj = {
+                    'list_id': item.list_id,
+                    'title': item.title,
+                    'label': labels[label_index_id].name,
+                    'start_time': item.start_time,
+                    'summary': item.summary,
+                    'complete': item.complete,
+                    'tmt_counts': item.tmt_counts,
+                    'complete_counts': item.complete_counts
+                }
+                lists.append(obj)
+            status = True
+            err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
+        response = {
+            "status": status,
+            'list': lists,
+            "err_code": err_code
+        }
+        return JsonResponse(response)
