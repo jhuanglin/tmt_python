@@ -25,6 +25,8 @@ urlpatterns = [
     path(r'api/login', tmt_views.login),
     path(r'api/register', tmt_views.register),
     path(r'api/logout', tmt_views.logout),
+    path(r'api/user/confirmpass', tmt_views.confirmPass),
+    path(r'api/user/changepass', tmt_views.updatePass),
     path(r'api/addconfig', tmt_views.addConfig),
     path(r'api/config', tmt_views.config),
     path(r'api/list', tmt_views.getList),
@@ -33,6 +35,18 @@ urlpatterns = [
     path(r'api/list/del', tmt_views.delList),
     path(r'api/list/complete', tmt_views.doneList),
     path(r'api/list/search_date', tmt_views.listSearchDate),
+    path(r'api/promo/add', tmt_views.addPromo),
+    path(r'api/time/count', tmt_views.getCountMins),
+    path(r'api/time/addcount', tmt_views.addCountMins),
+    path(r'api/promo', tmt_views.getPromo),
+    path(r'api/promo/del', tmt_views.delPromo),
+    path(r'api/list/completelist', tmt_views.getCompleteList),
+    path(r'api/user/changecompletelist', tmt_views.updateCompleteList),
+    path(r'api/list/delcompleteist', tmt_views.delCompleteList),
+    path(r'api/count/linechart', tmt_views.getLineChart),
+    path(r'api/count/piechart', tmt_views.getPieChart),
+    path(r'api/count/barchart', tmt_views.getBarChart),
+    path(r'api/count/data', tmt_views.getCountData)
     path('admin/', admin.site.urls),
 ]
 

@@ -90,7 +90,24 @@ class Promo(models.Model):
     end_date = models.DateTimeField(auto_now_add=True)
     # promo_id
     promo = models.ForeignKey('List', on_delete=models.CASCADE)
+    # label_id
+    label = models.ForeignKey('Label', on_delete=models.CASCADE)
+    # user_id
+    user = models.ForeignKey('User', on_delete=models.CASCADE) 
 
     def __str__(self):
-        return self.promo_id
+        return '开始时间： %s， 结束时间： %s' % (self.start_date, self.end_date)
+    __repr__ = __str__
+
+# 当前完成分钟
+class Count(models.Model):
+    ''' Count '''
+    today_date = models.DateField(auto_now_add=True)
+    count_mins = models.IntegerField(default=0)
+    count_promos = models.IntegerField(default=0)
+    # user_id 
+    user = models.ForeignKey('User', on_delete=models.CASCADE) 
+
+    def __str__(self):
+        return '日期： %s 完成分钟数 %s 完成番茄数 %s' % (self.today_date, self.count_mins, self.count_promos)
     __repr__ = __str__
