@@ -4,10 +4,11 @@ import time
 import datetime
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.db.models import Sum, Count
 from _project.models import User, UserConfig, Label, List, Promo, Count
 
 
-
+# 返回日期
 def getDate(obj):
     return datetime.datetime.strftime(obj['create_time'], '%Y-%m-%d')
 # Create your views here.
@@ -557,7 +558,8 @@ def getPromo(request):
             if start_date != '':
                 start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
                 end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
-                search_promo = Promo.objects.filter(user_id=user_id, start_date__range(start_date, end_date).order_by('-start_date')
+                # search_promo = Promo.objects.filter(user_id=user_id).order_by('-start_date')
+                search_promo = Promo.objects.filter(user_id=user_id, start_date__range=(start_date, end_date)).order_by('-start_date')
             else:
                 search_promo = Promo.objects.filter(user_id=user_id).order_by('-start_date')
             dates = list(set(map(getDate, search_promo.values('start_date'))))
@@ -639,47 +641,57 @@ def delPromo(request):
 '''
 getCompleteList
 @param user_id user_id
+@param start_date 搜索开始时间 %Y-%m-%d
+@param end_date 搜索开始时间 %Y-%m-%d
 '''
 def getCompleteList(request):
     if request.method == 'POST':
-    user_id =request.session['user_id']
-    lists = []
-    try:
-        # all_lists
-        all_lists = List.objects.filter(user_id=user_id, complete=True).order_by('-done_time')
-        labels = Label.objects.all()
-        for item in all_lists:
-            list_id = item.list_id
-            label_index_id = item.label_id - 1
-            promoLists = Promo.objects.get(promo_id=list_id, user_id=user_id)
-            # 获取第一次开始时间
-            start_time = promoLists.order_by('start_date')[0].start_date
-            # 获取最后一次结束时间
-            end_time = promoLists.order_by('-end_date')[0].end_date
-            obj = {
-                'list_id': list_id,
-                'title': item.title,
-                'label': labels[label_index_id].name,
-                'start_time': start_time.strftime('%Y-%m-%d'),
-                'end_time': end_time.strftime('%Y-%m-%d'),
-                'summary': item.summary,
-                'complete': item.complete,
-                'tmt_counts': item.tmt_counts,
-                'complete_counts': item.complete_counts
-            }
-            lists.append(obj)
-        status = True
-        err_code = 1
-    except Exception as e:
-        print(e)
-        status = False
-        err_code = 100
-    response = {
-        "status": status,
-        "data": lists,
-        "err_code": err_code
-    }
-    return JsonResponse(response)
+        data = json.loads(request.body.decode())
+        user_id = request.session['user_id']
+        start_date = data['start_date']
+        end_date = date['end_date']
+        lists = []
+        try:
+            if start_date != '':
+                start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+                all_lists = List.objects.filter(user_id=user_id, complete=True, done_time__range=(start_date, end_date)).order_by('-done_time')
+            else:
+                # all_lists
+                all_lists = List.objects.filter(user_id=user_id, complete=True).order_by('-done_time')
+            labels = Label.objects.all()
+            for item in all_lists:
+                list_id = item.list_id
+                label_index_id = item.label_id - 1
+                promoLists = Promo.objects.get(promo_id=list_id, user_id=user_id)
+                # 获取第一次开始时间
+                start_time = promoLists.order_by('start_date')[0].start_date
+                # 获取最后一次结束时间
+                end_time = promoLists.order_by('-end_date')[0].end_date
+                obj = {
+                    'list_id': list_id,
+                    'title': item.title,
+                    'label': labels[label_index_id].name,
+                    'start_time': start_time.strftime('%Y-%m-%d'),
+                    'end_time': end_time.strftime('%Y-%m-%d'),
+                    'summary': item.summary,
+                    'complete': item.complete,
+                    'tmt_counts': item.tmt_counts,
+                    'complete_counts': item.complete_counts
+                }
+                lists.append(obj)
+            status = True
+            err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
+        response = {
+            "status": status,
+            "data": lists,
+            "err_code": err_code
+        }
+        return JsonResponse(response)
 
 # 修改完成清单数据
 '''
@@ -739,9 +751,30 @@ def delCompleteList(request):
 # 获取初始统计数据
 '''
 getCountData
+@return historyCountMins 至今为止的所有分钟数
+@return historyCountPromos 至今为止的所有番茄数
+@return historyCountList 至今为止的所有完成清单数
 '''
 def getCountData(request):
-    pass
+    user_id = request.session['user_id']
+    try:
+        # 至今为止的所有分钟数
+        historyCountMins = int(Count.objects.aggregate(history_count_mins=Sum('count_mins'))['history_count_mins'])
+        # 至今为止的所有番茄数
+        historyCountPromos = int(Count.objects.aggregate(history_count_promos=Sum('count_promos'))['history_count_promos'])
+        # 至今为止的所有完成清单数
+        historyCountList = List.objects.filter(complete=True).count()
+        status = True
+        err_code = 1
+    except Exception as e:
+        status = False
+        err_code = 100
+    response = {
+        "status": status,
+        "err_code": err_code
+    }
+    return JsonResponse(response)
+
 
 # 获取不同日期下的番茄数
 '''
@@ -750,19 +783,152 @@ getLineChart
 @param end_date 结束时间
 '''
 def getLineChart(request):
-    pass
+    def getDay(obj):
+        return datetime.datetime.strftime(obj['today_date'], '%m-%d')
+    def getPromos(obj):
+        return obj['count_promos']
+    if request.method == 'POST':
+        data = json.loads(request.body.decode())
+        user_id = request.session['user_id']
+        start_date = data['start_date']
+        end_date = data['end_date']
+        today_date = datetime.datetime.now().date()
+        seven_days_before = today_date - datetime.timedelta(days=7)
+        chartData = {}
+        try:
+            if start_date != '':
+                start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+                end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+                count_promos = Count.objects.filter(user_id=user_id, today_date__range=(start_date, end_date)).order_by('today_date')
+            else:
+                count_promos = Count.objects.filter(user_id=user_id, today_date__range=(seven_days_before, today_date)).order_by('today_date')
+            dates = list(map(getDay, count_promos.values('today_date')))
+            promos = list(map(getPromos, count_promos.values('count_promos')))
+            all_mins = int(count_promos.aggregate(all_mins=Sum('count_mins'))['all_mins'])
+            chartData = {
+                "xdata": dates,
+                "ydata": promos,
+                "allMins": all_mins
+            }
+            status = True
+            err_code = 1
+        except Exception as e:
+            status = False
+            err_code = 100
+        response = {
+            "status": status,
+            "data": chartData,
+            "err_code": err_code 
+        }
+        return JsonResponse(response)
+        
 
 # 获取标签分类
 '''
 getPieChart
 '''
 def getPieChart(request):
-    pass
+    if request.method == 'POST':
+        user_id = request.session['user_id']
+        chartData = {}
+        labelData = []
+        legend = []
+        try:
+            all_promo = Promo.objects.filter(user_id=user_id)
+            labels_id = list(set(all_promo.values('label_id')))
+            label = Label.objects.all()
+            for label_id in labels_id:
+                label_name = label[label_id - 1].name
+                label_count = all_promo.filter(label_id=label_id).count
+                obj = {
+                    "value": label_count,
+                    "name": label_name
+                }
+                labelData.append(obj)
+                legend.append(label_name)
+            chartData = {
+                "'legend": legend,
+                "data": labelData
+            }
+            status = True
+            err_code = 1
+        except Exception as e:
+            status = False
+            err_code = 100
+        response = {
+            "status": status,
+            "data": chartData,
+            "err_code": err_code
+        }
+        return JsonResponse(response)
+
+
 
 # 获取最佳工作时间最佳工作日
 '''
 getBarChart
 '''
 def getBarChart(request):
-    pass
+    if request.method == 'POST':
+        weekday = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        user_id = request.session['user_id']
+        promosdata = [0 for x in range(7)]
+        datesdata = [0 for x in range(24)]
+        chartData = {}
+        try:
+            # 统计工作日时间 获取最佳工作日
+            all_counts = Count.objects.filter(user_id=user_id).values('today_date','count_promos')
+            for count in all_counts:
+                index = count.today_date.weekday()
+                promosdata[index] += count.count_promos
+            max_promo = max(promosdata)
+            howmany_day = promosdata.count(max)
+            if howmany_day == 1:
+                wdays = weekday[promosdata.index(max_promo)]
+            else:
+                where = [i for i in range(7) if promosdata[i] == max_promo]
+                wdays = ''
+                for i in where:
+                    wdays += ' ' + weeday[i]
+            pdb.set_trace()
+            # 获取最佳工作时间段
+            all_promos = Promo.objects.filter(user_id=user_id)
+            for promo in all_promos:
+                hour_index = promo.start_date.hour + 1
+                datesdata[hour_index] += 1
+            max_date = max(datesdata)
+            howmany_date = datsdata.count(max_date)
+            if howmany_date == 1:
+                index_date = datesdata.index(max_date) + 1
+                if index_date == 24:
+                    index_date = 0 
+                best_date = str(index_date) + ':00 ' + str(index_date + 1) + ":00"
+            else:
+                where_date = [i for i in range(24) if datesdata[i] == max_date]
+                best_date = ' '
+                for i in where_date:
+                    index_date += i + 1
+                    if index_date == 24:
+                        index_date = 0
+                    best_date += str(index_date) + ':00 ' + str(index_date + 1) + ":00"
+                    if i != len(where_date)-1:
+                        best_date += ','
+            chartData = {
+                "xdata": weekday,
+                'ydata': promosdata,
+                'best-date': best_date,
+                'bestday': wdays
+            }
+            status = True
+            err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
+        response = {
+            "status": status,
+            "data": chartData,
+            "err_code": err_code
+        }
+        return JsonResponse(response)
 
