@@ -41,7 +41,7 @@ urlpatterns = [
     path(r'api/promo', tmt_views.getPromo),
     path(r'api/promo/del', tmt_views.delPromo),
     path(r'api/list/completelist', tmt_views.getCompleteList),
-    path(r'api/user/changecompletelist', tmt_views.updateCompleteList),
+    path(r'api/list/changecompletelist', tmt_views.updateCompleteList),
     path(r'api/list/delcompleteist', tmt_views.delCompleteList),
     path(r'api/count/linechart', tmt_views.getLineChart),
     path(r'api/count/piechart', tmt_views.getPieChart),

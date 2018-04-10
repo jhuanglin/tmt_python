@@ -67,6 +67,10 @@ class List(models.Model):
     start_time = models.DateField(null=True)
     # 预计结束时间
     end_time = models.DateField(null=True)
+    # 第一次开始时间
+    start_date = models.DateTimeField(null=True)
+    # 最后一次结束时间
+    end_date = models.DateTimeField(null=True)
     # 状态
     # status = models.CharField(max_length=30)
     status = models.ForeignKey('Status', on_delete=models.CASCADE, null=True)
