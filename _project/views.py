@@ -5,7 +5,7 @@ import datetime
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.db.models import Sum, Count
-from _project.models import User, UserConfig, Label, List, Promo, Count
+from _project.models import User, UserConfig, Label, List, Promo, Count, UserIn
 
 
 # 返回日期
@@ -642,7 +642,7 @@ def delPromo(request):
         end_date = datetime.datetime.strptime(day + ' ' + data['end_date'], '%Y-%m-%d %H:%M')
         day_date = datetime.datetime.strptime(day, '%Y-%m-%d')
         try:
-            pdb.set_trace()
+            # pdb.set_trace()
             # Promo.objects.filter(user_id=user_id, promo_id=list_id, start_date=start_date, end_date=end_date).delete()
             del_promo = Promo.objects.filter(user_id=user_id, promo_id=list_id, start_date__date=start_date.date(), start_date__hour=start_date.hour,
             start_date__minute=start_date.minute, end_date__hour=end_date.hour, end_date__minute=end_date.minute)
@@ -941,16 +941,17 @@ def getBarChart(request):
                 minsdata[index] += count['count_mins']
             # 找到最大数
             max_promo = max(minsdata)
-            howmany_day = minsdata.count(max)
             wdays = []
-            # 当只有一个最大数
-            if howmany_day == 1:
-                wdays.append(weekdays[minsdata.index(max_promo)])
-            else:
-            # 不止一个最大数
-                where = [i for i in range(7) if minsdata[i] == max_promo]
-                for i in where:
-                    wdays.append(weekdays[i])
+            if max_promo > 0:
+                howmany_day = minsdata.count(max)
+                # 当只有一个最大数
+                if howmany_day == 1:
+                    wdays.append(weekdays[minsdata.index(max_promo)])
+                else:
+                # 不止一个最大数
+                    where = [i for i in range(7) if minsdata[i] == max_promo]
+                    for i in where:
+                        wdays.append(weekdays[i])
             # pdb.set_trace()
             # 获取最佳工作时间段
             all_promos = Promo.objects.filter(user_id=user_id)
@@ -962,26 +963,27 @@ def getBarChart(request):
                 datesdata[hour_index] += 1
             # 获取其中花费最多的时间段
             max_date = max(datesdata)
-            # 计算是否只有一个最大数
-            howmany_date = datesdata.count(max_date)
             bestdate = []
-            if howmany_date == 1:
-                index_date = datesdata.index(max_date) + 1
-                if index_date == 24:
-                    index_date = 0 
-                bestdate.append(index_date)
-                #  = str(index_date) + ':00-' + str(index_date + 1) + ":00"
-            else:
-                where_date = [i for i in range(24) if datesdata[i] == max_date]
-                bestdate = ' '
-                for i in where_date:
-                    index_date = i + 1
+            if max_date > 0:
+                # 计算是否只有一个最大数
+                howmany_date = datesdata.count(max_date)
+                if howmany_date == 1:
+                    index_date = datesdata.index(max_date) + 1
                     if index_date == 24:
-                        index_date = 0
+                        index_date = 0 
                     bestdate.append(index_date)
-                    #  += str(index_date) + ':00-' + str(index_date + 1) + ":00"
-                    # if i != len(where_date)-1:
-                        # bestdate += ','
+                    #  = str(index_date) + ':00-' + str(index_date + 1) + ":00"
+                else:
+                    where_date = [i for i in range(24) if datesdata[i] == max_date]
+                    bestdate = ' '
+                    for i in where_date:
+                        index_date = i + 1
+                        if index_date == 24:
+                            index_date = 0
+                        bestdate.append(index_date)
+                        #  += str(index_date) + ':00-' + str(index_date + 1) + ":00"
+                        # if i != len(where_date)-1:
+                            # bestdate += ','
             chartData = {
                 "xdata": weekdays,
                 'ydata': minsdata,
@@ -998,5 +1000,79 @@ def getBarChart(request):
             "status": status,
             "data": chartData,
             "err_code": err_code
+        }
+        return JsonResponse(response)
+
+# 获取用户历史状态
+def getUserStatus(request):
+    def getLabelId(obj):
+        return obj['label_id']
+    if request.method == 'post':
+        user_id = request.session['user_id']
+        today_date = datetime.datetime.now().date()
+        last_day = today_date - datetime.timedelta(days=1)
+        data = {}
+        isShow = False
+        count_promo = 0
+        count_complete_list = 0
+        count_mins = 0
+        count_label = []
+        promo_list = []
+        # 如果获取得到今日用户进来数据，则isShow置为False，反之为True
+        try:
+            user = UserIn.objects.get(user_id=user_id, today_date=today_date)
+            isShow = False
+        except Exception as e:
+            print(e)
+            user = UserIn.objects.create(user_id=user_id)
+            isShow = True
+        try:
+            counts = Count.objects.filter(today_date=last_day, user_id=user_id)
+            labels = Label.objects.all()
+            if len(counts) != 0:
+                count_data = counts[0]
+                # 获取昨日番茄累计数
+                count_promo = count_data.count_promos
+                # 获取昨日累计分钟数
+                count_mins = count_data.count_mins
+            # 获取昨日的番茄
+            promos = Promo.objects.filter(start_date__date=last_day, user_id=user_id)
+            # 获取昨日的标签统计
+            labels_id = list(set(map(getLabelId, promos.values('label_id'))))
+            for label_id in labels_id:
+                label_name = labels[label_id - 1].name
+                label_count = promos.filter(label_id=label_id).count()
+                obj = {
+                    "value": label_count,
+                    "name": label_name
+                }
+                count_label.append(obj)
+            # 获取昨日的番茄详情
+            for promo in promos:
+                obj = {}
+                obj.start_time = datetime.datetime.strftime(promo.start_date, '%M:%S')
+                obj.end_time = datetime.datetime.strftime(promo.end_date, '%M:%S')
+                obj.title = List.objects.get(list_id=promo.promo_id).title
+                promo_list.append(obj)
+            # 获取昨日完成的目标
+            count_complete_list = List.objects.filter(user_id=user_id, done_time__date=last_day, complete=True).count()
+            data = {
+                'count_promo': count_promo,
+                'count_list': count_list,
+                'count_mins': count_mins,
+                'count_label': count_label,
+                'promo_list': promo_list
+            }
+            status = True
+            err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
+        response = {
+            'status': status,
+            'isShow': isShow,
+            'data': data,
+            'err_code': err_code 
         }
         return JsonResponse(response)

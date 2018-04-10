@@ -115,3 +115,13 @@ class Count(models.Model):
     def __str__(self):
         return '日期： %s 完成分钟数 %s 完成番茄数 %s' % (self.today_date, self.count_mins, self.count_promos)
     __repr__ = __str__
+
+class UserIn(models.Model):
+    ''' UserIn '''
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    today_date = models.DateField(auto_now_add=True)
+    # first_in = models.BooleanField(default=False)
+
+    def __str__(self):
+        return '%s 是否第一次进: %s' % (self.today_date, self.first_in)
+    __repr__ = __str__

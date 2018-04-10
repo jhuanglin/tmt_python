@@ -47,6 +47,7 @@ urlpatterns = [
     path(r'api/count/piechart', tmt_views.getPieChart),
     path(r'api/count/barchart', tmt_views.getBarChart),
     path(r'api/count/data', tmt_views.getCountData),
+    path(r'api/user/status', tmt_views.getUserStatus),
     path('admin/', admin.site.urls),
 ]
 
