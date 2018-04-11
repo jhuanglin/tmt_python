@@ -5,7 +5,7 @@ import datetime
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.db.models import Sum, Count
-from _project.models import User, UserConfig, Label, List, Promo, Count, UserIn
+from _project.models import User, UserConfig, Label, List, Promo, Count, UserIn, UserFirstIn
 
 
 # 返回日期
@@ -50,27 +50,31 @@ def login(request):
         data = json.loads(request.body.decode())
         username = data['username']
         password = data['password']
-        user = {}
         try:
             # 查询是否该用户名
-            user = User.objects.get(username=username)
-        except:
-            pass
-        if not user:
-            # 用户不存在
-            status = False
-            err_code = '100'
-        else:
-            # 密码不一样
-            if user.password != password:
+            user = User.objects.filter(username=username)
+            if len(user) == 0:
+                # 用户不存在
                 status = False
-                err_code = '101'
+                err_code = '100'
             else:
-                # 存取session
-                request.session['user_id'] = user.id
-                # pdb.set_trace()
-                status = True
-                err_code = 1
+                user = user[0]
+                # 密码不一样
+                if user.password != password:
+                    status = False
+                    err_code = '101'
+                else:
+                    # 存取session
+                    request.session['user_id'] = user.id
+                    user_in = UserFirstIn.objects.filter(user_id=user.id)
+                    if len(user_in) == 0:
+                        UserFirstIn.objects.create(user_id=user.id)
+                    status = True
+                    err_code = 1
+        except Exception as e:
+            print(e)
+            status = False
+            err_code = 100
         response = {
             "status": status,
             "err_code": err_code
@@ -703,6 +707,8 @@ def getCompleteList(request):
                     'label': labels[label_index_id].name,
                     'start_time': start_time.strftime('%Y-%m-%d'),
                     'end_time': end_time.strftime('%Y-%m-%d'),
+                    'plane_start_time': item.start_time.strftime('%Y-%m-%d'),
+                    'plane_end_time': item.end_time.strftime('%Y-%m-%d'),
                     'summary': item.summary,
                     'complete': item.complete,
                     'tmt_counts': item.tmt_counts,
@@ -1003,75 +1009,88 @@ def getBarChart(request):
         }
         return JsonResponse(response)
 
+
 # 获取用户历史状态
 def getUserStatus(request):
     def getLabelId(obj):
         return obj['label_id']
-    if request.method == 'post':
+    if request.method == 'POST':
         user_id = request.session['user_id']
         today_date = datetime.datetime.now().date()
         last_day = today_date - datetime.timedelta(days=1)
         data = {}
-        isShow = False
+        is_first_in = True
+        is_show = False
         count_promo = 0
         count_complete_list = 0
         count_mins = 0
         count_label = []
         promo_list = []
+        last_date = datetime.datetime.strftime(last_day, '%Y-%m-%d')
         # 如果获取得到今日用户进来数据，则isShow置为False，反之为True
+        # pdb.set_trace()
         try:
-            user = UserIn.objects.get(user_id=user_id, today_date=today_date)
-            isShow = False
-        except Exception as e:
-            print(e)
-            user = UserIn.objects.create(user_id=user_id)
-            isShow = True
-        try:
-            counts = Count.objects.filter(today_date=last_day, user_id=user_id)
-            labels = Label.objects.all()
-            if len(counts) != 0:
-                count_data = counts[0]
-                # 获取昨日番茄累计数
-                count_promo = count_data.count_promos
-                # 获取昨日累计分钟数
-                count_mins = count_data.count_mins
-            # 获取昨日的番茄
-            promos = Promo.objects.filter(start_date__date=last_day, user_id=user_id)
-            # 获取昨日的标签统计
-            labels_id = list(set(map(getLabelId, promos.values('label_id'))))
-            for label_id in labels_id:
-                label_name = labels[label_id - 1].name
-                label_count = promos.filter(label_id=label_id).count()
-                obj = {
-                    "value": label_count,
-                    "name": label_name
-                }
-                count_label.append(obj)
-            # 获取昨日的番茄详情
-            for promo in promos:
-                obj = {}
-                obj.start_time = datetime.datetime.strftime(promo.start_date, '%M:%S')
-                obj.end_time = datetime.datetime.strftime(promo.end_date, '%M:%S')
-                obj.title = List.objects.get(list_id=promo.promo_id).title
-                promo_list.append(obj)
-            # 获取昨日完成的目标
-            count_complete_list = List.objects.filter(user_id=user_id, done_time__date=last_day, complete=True).count()
-            data = {
-                'count_promo': count_promo,
-                'count_list': count_list,
-                'count_mins': count_mins,
-                'count_label': count_label,
-                'promo_list': promo_list
-            }
+            first_user = UserFirstIn.objects.get(user_id=user_id)
+            is_first_in = first_user.is_first_in
+            if is_first_in:
+                first_user.is_first_in = False
+                first_user.save()
+            else:
+                user = UserIn.objects.filter(user_id=user_id, today_date=today_date)
+                if len(user) == 0:
+                    user = UserIn.objects.create(user_id=user_id)
+                    is_show = True
+                else:
+                    user = user[0]
+                    is_show = False
+                counts = Count.objects.filter(today_date=last_day, user_id=user_id)
+                labels = Label.objects.all()
+                if len(counts) != 0:
+                    count_data = counts[0]
+                    # 获取昨日番茄累计数
+                    count_promo = count_data.count_promos
+                    # 获取昨日累计分钟数
+                    count_mins = count_data.count_mins
+                # 获取昨日的番茄
+                promos = Promo.objects.filter(start_date__date=last_day, user_id=user_id)
+                # 获取昨日的标签统计
+                labels_id = list(set(map(getLabelId, promos.values('label_id'))))
+                for label_id in labels_id:
+                    label_name = labels[label_id - 1].name
+                    label_count = promos.filter(label_id=label_id).count()
+                    obj = {
+                        "value": label_count,
+                        "name": label_name
+                    }
+                    count_label.append(obj)
+                # 获取昨日的番茄详情
+                for promo in promos:
+                    obj = {
+                        'start_time': datetime.datetime.strftime(promo.start_date, '%H:%M'),
+                        'end_time': datetime.datetime.strftime(promo.end_date, '%H:%M'),
+                        'title': List.objects.get(list_id=promo.promo_id).title
+                    }
+                    promo_list.append(obj)
+                # 获取昨日完成的目标
+                count_complete_list = List.objects.filter(user_id=user_id, done_time__date=last_day, complete=True).count()
             status = True
             err_code = 1
         except Exception as e:
             print(e)
             status = False
             err_code = 100
+        data = {
+            'date': last_date,
+            'count_promo': count_promo,
+            'count_list': count_complete_list,
+            'count_mins': count_mins,
+            'count_label': count_label,
+            'promo_list': promo_list
+        }
         response = {
             'status': status,
-            'isShow': isShow,
+            'is_first_in': is_first_in,
+            'is_show': is_show,
             'data': data,
             'err_code': err_code 
         }

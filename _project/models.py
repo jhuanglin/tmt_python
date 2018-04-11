@@ -9,6 +9,17 @@ class User(models.Model):
 
     def __str__(self):
         return self.username
+    __repr__ = __str__
+
+class UserFirstIn(models.Model):
+    ''' UserFirstIn '''
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    create_time = models.DateTimeField(auto_now_add=True)
+    is_first_in = models.BooleanField(default=True)
+
+    def __str__(self):
+        return '用户 %s 第一次进来 %s' % (self.user_id, self.first_in)
+    __repr__ = __str__
 
 # 用户配置表
 class UserConfig(models.Model):
@@ -120,7 +131,6 @@ class UserIn(models.Model):
     ''' UserIn '''
     user = models.ForeignKey('User', on_delete=models.CASCADE)
     today_date = models.DateField(auto_now_add=True)
-    # first_in = models.BooleanField(default=False)
 
     def __str__(self):
         return '%s 是否第一次进: %s' % (self.today_date, self.first_in)
