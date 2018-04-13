@@ -349,11 +349,27 @@ def delList(request):
     if request.method == 'POST':
         data = json.loads(request.body.decode())
         list_id = data['list_id']
+        user_id = request.session['user_id']
         try:
-            List.objects.filter(list_id=list_id).delete()
+            # pdb.set_trace()
+            del_list = List.objects.filter(list_id=list_id)[0]
+            count_pros = Promo.objects.filter(promo_id=list_id)
+            for pro in count_pros:
+                day = pro.start_date.date()
+                old_count = Count.objects.get(user_id=user_id, today_date=day)
+                old_count.count_promos -= 1
+                old_count.count_mins = old_count.count_mins - pro.pro_mins
+                old_count.save()
+            del_list.delete()
+            count_pros.delete()
+            # count_pro_mins = int(Promo.objects.filter(promo_id=list_id).aggregate(promo_count_mins=Sum('pro_mins'))['promo_count_mins'])
+            # count = Count.objects.get(user_id=user_id)
+            # count.count_mins 
+            # .delete()
             status = True
             err_code = 1
-        except:
+        except Exception as e:
+            print(e)
             status = False
             err_code = 100
         response = {
@@ -464,6 +480,7 @@ def addPromo(request):
         user_id =request.session['user_id']
         start_date = data['start_date']
         label = data['label']
+        promo_mins = data['promoMins']
         today_date = datetime.datetime.now().date()
         try:
             # 获取label_id
@@ -473,12 +490,21 @@ def addPromo(request):
             # 存取开始时间
             new_promo.start_date = datetime.datetime.fromtimestamp(start_date / 1000)
             new_promo.label_id = label_id
-            new_promo.save()
+            new_promo.pro_mins = promo_mins
             up_list = List.objects.get(user_id=user_id, list_id=promo_id)
             up_list.complete_counts = up_list.complete_counts + 1
             # 添加第一次开始时间
             if up_list.start_date == None:
                 up_list.start_date = datetime.datetime.fromtimestamp(start_date / 1000)
+            # 添加统计
+            new_count = Count.objects.filter(today_date=today_date, user_id=user_id)
+            if len(new_count) == 0:
+                new_count = Count(user_id=user_id)
+            else:
+                new_count = new_count[0]
+            new_count.count_promos += 1
+            new_count.save()
+            new_promo.save()
             up_list.save()
             status = True
             err_code = 1
@@ -486,17 +512,6 @@ def addPromo(request):
             print(e)
             status = False
             err_code = 100
-        # 添加统计
-        try:
-            new_count = Count.objects.filter(today_date=today_date, user_id=user_id)
-            if len(new_count) == 0:
-                new_count = Count(user_id=user_id)
-            else:
-                new_count = new_count[0]
-            new_count.count_promos = new_count.count_promos + 1
-            new_count.save()
-        except Exception as e:
-            print(e)
         response = {
             "status": status,
             "err_code": err_code 
@@ -603,6 +618,7 @@ def getPromo(request):
                     label = labels[label_id-1].name
                     summary = insert_list.summary
                     pobj = {
+                        "id": item.id,
                         "list_id": promo_id,
                         "title": title,
                         "label": label,
@@ -640,21 +656,23 @@ def delPromo(request):
     if request.method == 'POST':
         data = json.loads(request.body.decode())
         user_id = request.session['user_id']
-        list_id = data['list_id']
+        # list_id = data['list_id']
         day = data['day']
-        start_date = datetime.datetime.strptime(day + ' ' + data['start_date'], '%Y-%m-%d %H:%M')
-        end_date = datetime.datetime.strptime(day + ' ' + data['end_date'], '%Y-%m-%d %H:%M')
+        promo_id = data['id']
+        # start_date = datetime.datetime.strptime(day + ' ' + data['start_date'], '%Y-%m-%d %H:%M')
+        # end_date = datetime.datetime.strptime(day + ' ' + data['end_date'], '%Y-%m-%d %H:%M')
         day_date = datetime.datetime.strptime(day, '%Y-%m-%d')
         try:
             # pdb.set_trace()
             # Promo.objects.filter(user_id=user_id, promo_id=list_id, start_date=start_date, end_date=end_date).delete()
-            del_promo = Promo.objects.filter(user_id=user_id, promo_id=list_id, start_date__date=start_date.date(), start_date__hour=start_date.hour,
-            start_date__minute=start_date.minute, end_date__hour=end_date.hour, end_date__minute=end_date.minute)
-            del_promo.delete()
+            del_promo = Promo.objects.filter(id=promo_id)
+            # del_promo = Promo.objects.filter(user_id=user_id, promo_id=list_id, start_date__date=start_date.date(), start_date__hour=start_date.hour, start_date__minute=start_date.minute, end_date__hour=end_date.hour, end_date__minute=end_date.minute)
+            promo_mins = del_promo[0].pro_mins
             old_count = Count.objects.get(user_id=user_id, today_date=day_date)
             old_count.count_promos = old_count.count_promos - 1
-            old_count.count_mins = old_count.count_mins - round((end_date - start_date).total_seconds() / 60)
+            old_count.count_mins = old_count.count_mins - promo_mins
             old_count.save()
+            del_promo.delete()
             status = True
             err_code = 1
         except Exception as e:
@@ -701,14 +719,20 @@ def getCompleteList(request):
                 start_time = item.start_date
                 # 获取最后一次结束时间
                 end_time = item.end_date
+                real_days = (end_time - start_time).days
+                plane_start_time = item.start_time
+                plane_end_time = item.end_time
+                plan_days = (plane_end_time - plane_start_time).days
                 obj = {
                     'list_id': list_id,
                     'title': item.title,
                     'label': labels[label_index_id].name,
                     'start_time': start_time.strftime('%Y-%m-%d'),
                     'end_time': end_time.strftime('%Y-%m-%d'),
-                    'plane_start_time': item.start_time.strftime('%Y-%m-%d'),
-                    'plane_end_time': item.end_time.strftime('%Y-%m-%d'),
+                    'real_days': real_days + 1,
+                    'plane_start_time': plane_start_time.strftime('%Y-%m-%d'),
+                    'plane_end_time': plane_end_time.strftime('%Y-%m-%d'),
+                    'plan_days': plan_days + 1,
                     'summary': item.summary,
                     'complete': item.complete,
                     'tmt_counts': item.tmt_counts,
@@ -795,11 +819,11 @@ def getCountData(request):
     data = {}
     try:
         # 至今为止的所有分钟数
-        historyCountMins = int(Count.objects.aggregate(history_count_mins=Sum('count_mins'))['history_count_mins'])
+        historyCountMins = int(Count.objects.filter(user_id=user_id).aggregate(history_count_mins=Sum('count_mins'))['history_count_mins'])
         # 至今为止的所有番茄数
-        historyCountPromos = int(Count.objects.aggregate(history_count_promos=Sum('count_promos'))['history_count_promos'])
+        historyCountPromos = int(Count.objects.filter(user_id=user_id).aggregate(history_count_promos=Sum('count_promos'))['history_count_promos'])
         # 至今为止的所有完成清单数
-        historyCountList = List.objects.filter(complete=True).count()
+        historyCountList = List.objects.filter(user_id=user_id,complete=True).count()
         status = True
         data = {
             "historyCountMins": historyCountMins,
@@ -808,6 +832,7 @@ def getCountData(request):
         }
         err_code = 1
     except Exception as e:
+        print(e)
         status = False
         err_code = 100
     response = {
@@ -981,7 +1006,7 @@ def getBarChart(request):
                     #  = str(index_date) + ':00-' + str(index_date + 1) + ":00"
                 else:
                     where_date = [i for i in range(24) if datesdata[i] == max_date]
-                    bestdate = ' '
+                    bestdate = []
                     for i in where_date:
                         index_date = i + 1
                         if index_date == 24:

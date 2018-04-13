@@ -49,14 +49,6 @@ class Label(models.Model):
         return 'name: %s' % (self.name)
     __repr__ = __str__
 
-# 状态表
-class Status(models.Model):
-    """ Status model """
-    status = models.CharField(max_length=30)
-
-    def __str__(self):
-        return 'status: %s' % (self.status)
-
 # 任务清单表
 class List(models.Model):
     """ List model """
@@ -84,7 +76,7 @@ class List(models.Model):
     end_date = models.DateTimeField(null=True)
     # 状态
     # status = models.CharField(max_length=30)
-    status = models.ForeignKey('Status', on_delete=models.CASCADE, null=True)
+    # status = models.ForeignKey('Status', on_delete=models.CASCADE, null=True)
     # 总结
     summary = models.TextField(null=True)
     # 标签
@@ -103,6 +95,8 @@ class Promo(models.Model):
     start_date = models.DateTimeField()
     # 结束时间
     end_date = models.DateTimeField(auto_now_add=True)
+    # 总共时长
+    pro_mins = models.IntegerField(default=0)
     # promo_id
     promo = models.ForeignKey('List', on_delete=models.CASCADE)
     # label_id
